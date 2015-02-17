@@ -15,34 +15,76 @@ library(kernlab)
 Then we load the data
 ```{r Load Data, cache= TRUE, warning=FALSE}
 train <- read.csv("C:/Users/Betty/Box Sync/Courses/Coursera - Practical Machine Learning/pml-training.csv")
-test <- read.csv("C:/Users/Betty/Box Sync/Courses/Coursera - Practical Machine Learning/pml-testing.csv")
 
 ```
 
 2. Preprocessing
 Now we preprocess the data
 ```{r PreProcess, cache= TRUE, warning=FALSE}
-# Removing summary rows/columns
-tr <- subset(train, (train[ ,12] == "")) # remove summary rows
-tr[tr == ""] <- "NA"
-tr <- Filter(function(x)!all(is.na(x)), tr)  # remove empty columns
-
-# Remove zero variable predictors
-nsv <- nearZeroVar(tr, saveMetrics=TRUE) #check near zero variates
-tr<- tr[,colnames(tr)!="new_window"] #remove the zero variate columns
-
-#Remove other data columns for cleaning purposes
-tr <- tr[,-which(names(tr) %in% c("user_name","cvtd_timestamp"))]
-
-#To test out of sample error, we break the training set into two - trA and trB
-inTrain <- createDataPartition(y=tr$classe, p=0.7, list=FALSE)
-trA <- droplevels(tr[inTrain,])
-trB <- droplevels(tr[-inTrain,])
-
-#Create the test set with the same filtered columns as the training sets
-ts <- test
-ts <- as.data.frame(lapply(intersect(names(ts), names(tr)), 
-              function(name) ts[name]))
+Set <- c("user_name",
+"raw_timestamp_part_1",
+"raw_timestamp_part_2",
+"cvtd_timestamp",
+"new_window",
+"num_window",
+"roll_belt",
+"pitch_belt",
+"yaw_belt",
+"total_accel_belt",
+"gyros_belt_x",
+"gyros_belt_y",
+"gyros_belt_z",
+"accel_belt_x",
+"accel_belt_y",
+"accel_belt_z",
+"magnet_belt_x",
+"magnet_belt_y",
+"magnet_belt_z",
+"roll_arm",
+"pitch_arm",
+"yaw_arm",
+"total_accel_arm",
+"gyros_arm_x",
+"gyros_arm_y",
+"gyros_arm_z",
+"accel_arm_x",
+"accel_arm_y",
+"accel_arm_z",
+"magnet_arm_x",
+"magnet_arm_y",
+"magnet_arm_z",
+"roll_dumbbell",
+"pitch_dumbbell",
+"yaw_dumbbell",
+"total_accel_dumbbell",
+"gyros_dumbbell_x",
+"gyros_dumbbell_y",
+"gyros_dumbbell_z",
+"accel_dumbbell_x",
+"accel_dumbbell_y",
+"accel_dumbbell_z",
+"magnet_dumbbell_x",
+"magnet_dumbbell_y",
+"magnet_dumbbell_z",
+"roll_forearm",
+"pitch_forearm",
+"yaw_forearm",
+"total_accel_forearm",
+"gyros_forearm_x",
+"gyros_forearm_y",
+"gyros_forearm_z",
+"accel_forearm_x",
+"accel_forearm_y",
+"accel_forearm_z",
+"magnet_forearm_x",
+"magnet_forearm_y",
+"magnet_forearm_z",
+"classe")
+trainClean   <-  train[ ,Set]
+set.seed(224)
+inTrain = createDataPartition(trainClean$classe, p=0.60, list=FALSE)
+training = trainClean[inTrain,]
+validating = trainClean[-inTrain,]
 ```
 
 3. Prediction
@@ -51,33 +93,35 @@ The caret train function was not used since computing time was too long.
 We use the randomForest function directly.
 ```{r Prediction, cache= TRUE, warning=FALSE}
 library(randomForest)
-library(ROCR)
-#bestmtry <- tuneRF(tr[,-57],tr[,57], ntreeTry=100, 
-#     stepFactor=1.5,improve=0.01, trace=TRUE, plot=TRUE, dobest=FALSE) 
-#We ran the above earlier and got mtry=10 as a result
-exercise.rf <-randomForest(classe~.,data=trA, mtry=10, ntree=1000, 
-     keep.forest=TRUE, importance=TRUE,test=trB) #create the random forest model
+rfModel <-randomForest(classe~.,data=training) #create the random forest model
 ```
 
 Review Importance of Variables
 ```{r Check Variables, cache= TRUE, warning=FALSE}
-importance(exercise.rf)
-varImpPlot(exercise.rf) #See how much each variable contributes to the model
+importance(rfModel)
+varImpPlot(rfModel) #See how much each variable contributes to the model
 ```
 
-Out of Sample Error Rate
-This is calculated by looking at the accuracy of the prediction for the training set B.
+4. Out of Sample Error Rate and Accuracy
+Because we are using the random forest method, an out of sample error rate is not necessary. However, we calculate the accuracy by running the model against training set B
 
 ```{r Out of Sample Error, cache= TRUE, warning=FALSE}
-pred <- predict(exercise.rf, trB, OOB=TRUE) #predict using train set B as test
-confusionMatrix(trB$classe, pred) #load confusion matrix
+pred <- predict(rfModel, validating) #predict using train set B as test
+confusionMatrix(validating$classe, pred) #load confusion matrix
 ```
 
-From the confusion matrix, we see that our model is in a sense, perfectly matches the actual values. This means our out of sample error is nearly 0.
+From the confusion matrix, we see that our model is very accurate with an accuracy of 0.9981
 
 
-Predict Using Test Set
+5. Predict Using Test Set
+Now let's apply our model to the test set
 ```{r Predict with Test Set, cache= TRUE, warning=FALSE}
-pred <- predict(exercise.rf, ts, OOB=TRUE)
-pred
+testing <- read.csv("C:/Users/Betty/Box Sync/Courses/Coursera - Practical Machine Learning/pml-testing.csv")
+testClean <- testing[ ,Set[-59]]
+testing <- rbind(training[100, -59] , testClean) 
+testing <- testing[-1,]
+
+predictions <- predict(rfModel,newdata=testing)
+print(predictions)
+
 ```
